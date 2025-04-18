@@ -88,7 +88,7 @@ function render(){
 		}
 		
 		if(foundPokemon.name){
-			ctx.drawImage(foundPokemon.spriteFront,811+animX*4,43+animY*4,288,288);
+			ctx.drawImage(foundPokemon.spriteFront,811+animX*4,36+animY*4,288,288);
 			ctx.fillStyle = "#e0e0e0";
 			ctx.fillText(foundPokemon.name, 800, 350);
 		}else{
@@ -96,7 +96,7 @@ function render(){
 			ctx.fillText(userDisplayText, 800, 375);
 		}
 	}else if(page=="battle"){
-		ctx.drawImage(foundPokemon.spriteFront,811+animX*4,43+animY*4,288,288);
+		ctx.drawImage(foundPokemon.spriteFront,811+animX*4,36+animY*4,288,288);
 		ctx.fillStyle = "#10b010";
 		ctx.fillRect(800,375,300*foundPokemon.hp/foundPokemon.json.stats[0].base_stat,25);
 		ctx.fillStyle = "#e0e0e0";
@@ -139,7 +139,7 @@ function render(){
 		ctx.font = "15px Arial";
 		ctx.fillStyle = "#e0e0e0";
 		ctx.fillText(userDisplayText,100,630);
-		ctx.fillText(oppDisplayText,800,60);
+		ctx.fillText(oppDisplayText,800,25);
 		
 	}
 }
@@ -202,6 +202,8 @@ window.addEventListener('keydown', function(event) {
 				}
 			}else{
 				page="map";
+				foundPokemon={"name":"","json":"","hp":0,"spriteFront":new Image(),"spriteBack":new Image()};
+				userDisplayText="Try Again";
 			}
 		}else if("1"<=event.key<="4"){
 			if(currentPokemon<player.pokemon.length&&event.key-1<player.pokemon[currentPokemon].json.abilities.length){

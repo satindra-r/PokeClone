@@ -6,13 +6,20 @@ let page="instructions";
 let dataLoaded=false;
 let imagesLoaded=false;
 let player={"dir":"down","loc":{"x":0,"y":0},"sprites":{"up":new Image(),"right":new Image(),"down":new Image(),"left":new Image()},"pokemon":[]};
-let foundPokemon={"name":"","json":"","hp":0,"scream":"","spriteFront":new Image(),"spriteBack":new Image()};
+let foundPokemon={"name":"","json":"","hp":0,"type":"","scream":"","spriteFront":new Image(),"spriteBack":new Image()};
 let currentPokemon=0;
 let map=new Image();
 let bg=new Image();
 let userDisplayText="Try Again";
 let oppDisplayText="";
 let animStep=0;
+let matchups=
+			{"fire":{"fire":0.5,"water":0.5,"grass":2,"ice":2,"ground":1,"rock":0.5}
+			,"water":{"fire":2,"water":0.5,"grass":0.5,"ice":1,"ground":2,"rock":2}
+			,"grass":{"fire":0.5,"water":2,"grass":0.5,"ice":1,"ground":2,"rock":2}
+			,"ice":{"fire":0.5,"water":0.5,"grass":2,"ice":0.5,"ground":2,"rock":1}
+			,"ground":{"fire":2,"water":1,"grass":0.5,"ice":1,"ground":1,"rock":2}
+			,"rock":{"fire":2,"water":1,"grass":,"ice":2,"ground":0.5,"rock":1}}
 let mapTiles=
 			[["ice","ice","ice","ground","ground","ground","ground","ground"]
 			,["ice","ice","water","ground","ground","ground","ground","grass"]
@@ -36,7 +43,7 @@ async function loadData(){
 	types=Object.fromEntries(typesarr);
 }
 async function searchPokemon(loc){ 
-	if(Math.random()>0.8){
+	if(Math.random()>-0.8){
 		let type=mapTiles[player.loc.y][player.loc.x];
 		return getRandomPokemon(type).then((randPokemon)=>{return randPokemon});
 	}else{
@@ -45,10 +52,11 @@ async function searchPokemon(loc){
 	}
 }
 async function getRandomPokemon(type){
-	let randPokemon={"name":"","json":"","hp":0,"scream":"","spriteFront":new Image(),"spriteBack":new Image()};
+	let randPokemon={"name":"","json":"","hp":0,"type":"","scream":"","spriteFront":new Image(),"spriteBack":new Image()};
 	randPokemon.name=types[type].pokemon[Math.floor((types[type].pokemon.length)*Math.random())].pokemon.name;
 	let response= await fetch("https://pokeapi.co/api/v2/pokemon/"+randPokemon.name);
 	randPokemon.json=await response.json();
+	randPokemon.type=type;
 	randPokemon.hp=randPokemon.json.stats[0].base_stat;
 	await Promise.all([new Promise((resolve) => {
 		randPokemon.spriteFront.src = randPokemon.json.sprites.front_default;
@@ -104,6 +112,7 @@ function render(){
 	ctx.fillRect(0,0,1200,650);
 	if(page=="instructions"){
 		ctx.font = "40px Pixelify Sans";
+		ctx.strokeStyle="#e0e0e0";
 		ctx.fillStyle = '#e0e0e0';
 		ctx.fillText("Use WASD or arrow keys to move",100,200);
 		ctx.fillText("Use Spacebar to capture pokemon and throw pokeballs",100,275);
@@ -127,50 +136,59 @@ function render(){
 		}
 	}else if(page=="battle"){
 		ctx.drawImage(bg,0,0);
+		ctx.fillStyle = "#000000";
+		ctx.fillRect(5,565,1190,80);
 		ctx.drawImage(foundPokemon.spriteFront,811+animX*4,36+animY*4,288,288);
-		ctx.fillStyle = "#b01010";
-		ctx.fillRect(800,375,300*foundPokemon.hp/foundPokemon.json.stats[0].base_stat,25);
+		ctx.fillStyle="#e0e0e0";
+		ctx.fillRect(798,373,500,14);
+		ctx.fillStyle = "#f09010";
+		ctx.fillRect(825,375,300*foundPokemon.hp/foundPokemon.json.stats[0].base_stat,10);
 		ctx.fillStyle = "#101010";
-		ctx.fillText(foundPokemon.name, 800, 350);
-		ctx.fillText(foundPokemon.hp,800,400);
+		ctx.strokeText(foundPokemon.name, 800, 360);
+		ctx.fillText(foundPokemon.name, 800, 360);
+		ctx.strokeText(foundPokemon.hp+"/"+foundPokemon.json.stats[0].base_stat,800,405);
+		ctx.fillText(foundPokemon.hp+"/"+foundPokemon.json.stats[0].base_stat,800,405);
+		ctx.fillStyle="#10b010";
+		ctx.font ="15px Pixelify Sans"
+		ctx.fillText("HP", 800, 385);
 		
 		if(currentPokemon<player.pokemon.length){
-			ctx.drawImage(player.pokemon[currentPokemon].spriteBack,111-animX*4,229+animY*4,288,288);
-			ctx.fillStyle = "#b01010";
-			ctx.fillRect(100,575,300*player.pokemon[currentPokemon].hp/player.pokemon[currentPokemon].json.stats[0].base_stat,25);
+			ctx.font = "25px Pixelify Sans";
+			ctx.drawImage(player.pokemon[currentPokemon].spriteBack,111-animX*4,111+animY*4,288,288);
+			ctx.fillStyle = "#e0e0e0";
+			ctx.fillRect(0,433,402,14);
+			ctx.fillStyle = "#f09010";
+			ctx.fillRect(100,435,300*player.pokemon[currentPokemon].hp/player.pokemon[currentPokemon].json.stats[0].base_stat,10);
 			ctx.fillStyle = "#101010";
-			ctx.fillText(player.pokemon[currentPokemon].name, 100, 550);
-			ctx.fillText(player.pokemon[currentPokemon].hp,100,600);
-			ctx.font = "15px Pixelify Sans";
-			if(player.pokemon[currentPokemon].json.moves[0]){
-				ctx.fillStyle = "#909090";
-				ctx.fillRect(750,450,175,50);
-				ctx.fillStyle="#101010";
-				ctx.fillText("(1) "+player.pokemon[currentPokemon].json.moves[0].move.name,755,475);
-			}
-			if(player.pokemon[currentPokemon].json.moves[1]){
-				ctx.fillStyle = "#909090";
-				ctx.fillRect(975,450,175,50);
-				ctx.fillStyle="#101010";
-				ctx.fillText("(2) "+player.pokemon[currentPokemon].json.moves[1].move.name,980,475);
-			}
-			if(player.pokemon[currentPokemon].json.moves[2]){
-				ctx.fillStyle = "#909090";
-				ctx.fillRect(750,525,175,50);
-				ctx.fillStyle="#101010";
-				ctx.fillText("(3) "+player.pokemon[currentPokemon].json.moves[2].move.name,755,550);
-			}
-			if(player.pokemon[currentPokemon].json.moves[3]){
-				ctx.fillStyle = "#909090";
-				ctx.fillRect(975,525,175,50);
-				ctx.fillStyle="#101010";
-				ctx.fillText("(4) "+player.pokemon[currentPokemon].json.moves[3].move.name,980,550);
-			}
+			ctx.strokeText(player.pokemon[currentPokemon].name, 75, 425);
+			ctx.fillText(player.pokemon[currentPokemon].name, 75, 425);
+			ctx.strokeText(player.pokemon[currentPokemon].hp+"/"+player.pokemon[currentPokemon].json.stats[0].base_stat,75,465);
+			ctx.fillText(player.pokemon[currentPokemon].hp+"/"+player.pokemon[currentPokemon].json.stats[0].base_stat,75,465);
+			ctx.fillStyle="#10b010";
+			ctx.font ="15px Pixelify Sans"
+			ctx.fillText("HP", 75, 445);
+			
+			ctx.fillStyle = "#909090";
+			ctx.fillRect(750,425,175,50);
+			ctx.fillStyle="#101010";
+			ctx.fillText("(1) "+player.pokemon[currentPokemon].json.moves[0].move.name,755,450);
+			ctx.fillStyle = "#909090";
+			ctx.fillRect(975,425,175,50);
+			ctx.fillStyle="#101010";
+			ctx.fillText("(2) "+player.pokemon[currentPokemon].json.moves[1].move.name,980,450);
+			ctx.fillStyle = "#909090";
+			ctx.fillRect(750,500,175,50);
+			ctx.fillStyle="#101010";
+			ctx.fillText("(3) "+player.pokemon[currentPokemon].json.moves[2].move.name,755,525);
+			ctx.fillStyle = "#909090";
+			ctx.fillRect(975,500,175,50);
+			ctx.fillStyle="#101010";
+			ctx.fillText("(4) "+player.pokemon[currentPokemon].json.moves[3].move.name,980,525);
 		}
-		ctx.font = "15px Pixelify Sans";
-		ctx.fillStyle = "#101010";
-		ctx.fillText(userDisplayText,100,630);
-		ctx.fillText(oppDisplayText,800,25);
+		ctx.font = "30px Pixelify Sans";
+		ctx.fillStyle = "#e0e0e0";
+		ctx.fillText(userDisplayText,100,595);
+		ctx.fillText(oppDisplayText,100,625);
 		
 	}
 }
@@ -213,7 +231,7 @@ window.addEventListener('keydown', function(event) {
 				if(foundPokemon.name!=""){
 					if(player.pokemon==""){ 
 						player.pokemon.push(foundPokemon);
-						foundPokemon={"name":"","json":"","hp":0,"scream":"","spriteFront":new Image(),"spriteBack":new Image()};
+						foundPokemon={"name":"","json":"","hp":0,"type":"","scream":"","spriteFront":new Image(),"spriteBack":new Image()};
 						userDisplayText="Starter Chosen";
 					}else{
 						page="battle";
@@ -232,29 +250,42 @@ window.addEventListener('keydown', function(event) {
 				if(Math.random()>foundPokemon.hp/foundPokemon.json.stats[0].base_stat){
 					userDisplayText="You Caught "+foundPokemon.name;
 					player.pokemon.push(foundPokemon);
-					foundPokemon={"name":"","json":"","hp":0,"scream":"","spriteFront":new Image(),"spriteBack":new Image()};
+					foundPokemon={"name":"","json":"","hp":0,"type":"","scream":"","spriteFront":new Image(),"spriteBack":new Image()};
 					page="map"
 				}else{
 					userDisplayText="Couldn't Catch "+foundPokemon.name;
+					oppDisplayText="";
 				}
 			}else{
 				page="map";
-				foundPokemon={"name":"","json":"","hp":0,"scream":"","spriteFront":new Image(),"spriteBack":new Image()};
+				foundPokemon={"name":"","json":"","hp":0,"type":"","scream":"","spriteFront":new Image(),"spriteBack":new Image()};
 				userDisplayText="Try Again";
 			}
 		}else if("1"<=event.key<="4"){
 			if(currentPokemon<player.pokemon.length&&event.key-1<player.pokemon[currentPokemon].json.moves.length){
 				foundPokemon.scream.play();
-				foundPokemon.hp-=Math.ceil(Math.max(0,player.pokemon[currentPokemon].json.stats[1].base_stat-(foundPokemon.json.stats[2].base_stat/2))/10);
-				player.pokemon[currentPokemon].hp-=Math.ceil(Math.max(0,foundPokemon.json.stats[1].base_stat-(player.pokemon[currentPokemon].json.stats[2].base_stat/2))/10);
+				foundPokemon.hp-=Math.ceil((Math.max(0,player.pokemon[currentPokemon].json.stats[1].base_stat-(foundPokemon.json.stats[2].base_stat/2))/10)*matchups[player.pokemon[currentPokemon].type][foundPokemon.type]);
+				player.pokemon[currentPokemon].hp-=Math.ceil((Math.max(0,foundPokemon.json.stats[1].base_stat-(player.pokemon[currentPokemon].json.stats[2].base_stat/2))/10)*matchups[foundPokemon.type][player.pokemon[currentPokemon].type]);
 				userDisplayText="You Used "+player.pokemon[currentPokemon].json.moves[event.key-1].move.name;
 				oppDisplayText=foundPokemon.name+" Used "+foundPokemon.json.moves[Math.floor(foundPokemon.json.moves.length*Math.random())].move.name;
+				if(matchups[foundPokemon.type][player.pokemon[currentPokemon].type]==2){
+					oppDisplayText+=", It was super effective";
+				}
+				if(matchups[player.pokemon[currentPokemon].type][foundPokemon.type]==2){
+					userDisplayText+=", It was super effective";
+				}
+				if(matchups[foundPokemon.type][player.pokemon[currentPokemon].type]==0.5){
+					oppDisplayText+=", It was not very effective";
+				}
+				if(matchups[player.pokemon[currentPokemon].type][foundPokemon.type]==0.5){
+					userDisplayText+=", It was not very effective";
+				}
 				if(foundPokemon.hp<=0){
-					oppDisplayText+=" and Fainted";
+					oppDisplayText+=" but Fainted";
 					foundPokemon.hp=0;
 				}
 				if(player.pokemon[currentPokemon].hp<=0){
-					userDisplayText+=" and Fainted";
+					userDisplayText+=" but Fainted";
 					player.pokemon[currentPokemon].hp=0;
 					currentPokemon++;
 				}

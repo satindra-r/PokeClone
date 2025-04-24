@@ -17,7 +17,17 @@ let displayStep=0;
 let mouseClicked=false;
 let mouseLoc=[0,0];
 let canvasPos = canvas.getBoundingClientRect();
-let g=0.5;
+let pokemonLoc=0;
+let ballCount=5;
+let ballLoc=[];
+let launchLoc=[];
+let launchLocPrev=[];
+let vel=0;
+let velPrev=0;
+let angle=0;
+let anglePrev=0;
+let g=10;
+let ballTime=Infinity;
 let matchups=
 			{"fire":{"fire":0.5,"water":0.5,"grass":2,"ice":2,"ground":1,"rock":0.5}
 			,"water":{"fire":2,"water":0.5,"grass":0.5,"ice":1,"ground":2,"rock":2}
@@ -62,9 +72,7 @@ function drawThrough(ctx,thickness,x1,y1,x2,y2,x3,y3){
 	drawTo(ctx,thickness,x1,y1,2*x2-0.5*x1-0.5*x3,2*y2-0.5*y1-0.5*y3,x3,y3);
 }
 function drawBaguette(ctx,thickness,x1,y1,vel,angle,g){
-	ctx.fillRect(x1,500-y1,100*Math.cos(angle),100*Math.sin(angle));
 	let range=vel*Math.cos(angle)*(vel*Math.sin(angle)+(Math.sqrt(vel*vel*Math.sin(angle)*Math.sin(angle)+2*y1*g)))/g
-	ctx.fillRect(x1,y1,range,10);
 	let y2=(1-(vel*vel*Math.sin(angle)*Math.cos(angle)/(range*g)))*(y1+Math.tan(angle)*range);
 	let x2=(y2-y1)/Math.tan(angle)+x1;
 	drawTo(ctx,thickness,x1,500-y1,x2,500-y2,range+x1,500);
@@ -79,7 +87,8 @@ async function loadData(){
 	);
 	types=Object.fromEntries(typesarr);
 }
-async function searchPokemon(loc){ 
+async function searchPokemon(loc){
+	//TODO testing 
 	if(Math.random()>-0.8){
 		let type=mapTiles[player.loc.y][player.loc.x];
 		let randPokemon=await getRandomPokemon(type).then((randPokemon)=>{return randPokemon});
@@ -99,9 +108,7 @@ async function getRandomPokemon(type){
 	randPokemon.json=await response.json();
 	randPokemon.lvl=Math.floor(Math.random()*100);
 	randPokemon.type=type;
-	//TODO testing
-	//randPokemon.hp=randPokemon.json.stats[0].base_stat;
-	randPokemon.hp=1;
+	randPokemon.hp=randPokemon.json.stats[0].base_stat;
 	await Promise.all([new Promise((resolve) => {
 		randPokemon.spriteFront.src = randPokemon.json.sprites.front_default;
 		randPokemon.spriteFront.onload = resolve;
@@ -154,6 +161,42 @@ async function loadImages(){
 	player.sprites["left"].src="player_left.png";
 	map.src="map.png";
 }
+function doAttack(num){
+	foundPokemon.scream.play();
+	foundPokemon.hp-=Math.ceil((Math.max(0,player.pokemon[currentPokemon].json.stats[1].base_stat-(foundPokemon.json.stats[2].base_stat/2))/10)*matchups[player.pokemon[currentPokemon].type][foundPokemon.type]);
+	player.pokemon[currentPokemon].hp-=Math.ceil((Math.max(0,foundPokemon.json.stats[1].base_stat-(player.pokemon[currentPokemon].json.stats[2].base_stat/2))/10)*matchups[foundPokemon.type][player.pokemon[currentPokemon].type]);
+	userDisplayText="You Used "+format(player.pokemon[currentPokemon].json.moves[num-1].move.name);
+	oppDisplayText=format(foundPokemon.name)+" Used "+format(foundPokemon.json.moves[Math.floor(foundPokemon.json.moves.length*Math.random())].move.name);
+	displayStep=0;
+	oppRenderStep=0;
+	if(matchups[foundPokemon.type][player.pokemon[currentPokemon].type]==2){
+		oppDisplayText+=", It was Super Effective";
+		oppRenderStep=0;
+	}
+	if(matchups[player.pokemon[currentPokemon].type][foundPokemon.type]==2){
+		userDisplayText+=", It was Super Effective";
+		displayStep=0;
+	}
+	if(matchups[foundPokemon.type][player.pokemon[currentPokemon].type]==0.5){
+		oppDisplayText+=", It was not Very Effective";
+		oppRenderStep=0;
+	}
+	if(matchups[player.pokemon[currentPokemon].type][foundPokemon.type]==0.5){
+		userDisplayText+=", It was not Very Effective";
+		displayStep=0;
+	}
+	if(foundPokemon.hp<=0){
+		oppDisplayText+=" but it Fainted";
+		oppRenderStep=0;
+		foundPokemon.hp=0;
+	}
+	if(player.pokemon[currentPokemon].hp<=0){
+		userDisplayText+=" but it Fainted";
+		displayStep=0;
+		player.pokemon[currentPokemon].hp=0;
+		currentPokemon++;
+	}
+}
 function render(){
 	animStep+=0.1;
 	animStep%=10;
@@ -191,7 +234,11 @@ function render(){
 		ctx.drawImage(foundPokemon.spriteFront,811+animX*4,36+animY*4,288,288);
 		ctx.fillStyle="#e0e0e0";
 		ctx.fillRect(798,373,500,14);
-		ctx.fillStyle = "#f09010";
+		if(foundPokemon.hp/foundPokemon.json.stats[0].base_stat<1/3){
+			ctx.fillStyle = "#f01010";
+		}else{
+			ctx.fillStyle = "#f09010";
+		}
 		ctx.fillRect(825,375,300*foundPokemon.hp/foundPokemon.json.stats[0].base_stat,10);
 		ctx.fillStyle = "#101010";
 		ctx.strokeText(format(foundPokemon.name), 800, 360);
@@ -209,7 +256,11 @@ function render(){
 			ctx.drawImage(player.pokemon[currentPokemon].spriteBack,111-animX*4,111+animY*4,288,288);
 			ctx.fillStyle = "#e0e0e0";
 			ctx.fillRect(0,433,402,14);
-			ctx.fillStyle = "#f09010";
+			if(player.pokemon[currentPokemon].hp/player.pokemon[currentPokemon].json.stats[0].base_stat<1/3){
+				ctx.fillStyle = "#f01010";
+			}else{
+				ctx.fillStyle = "#f09010";
+			}
 			ctx.fillRect(100,435,300*player.pokemon[currentPokemon].hp/player.pokemon[currentPokemon].json.stats[0].base_stat,10);
 			ctx.fillStyle = "#101010";
 			ctx.strokeText(format(player.pokemon[currentPokemon].name), 75, 425);
@@ -222,20 +273,24 @@ function render(){
 			ctx.font ="15px Pixelify Sans"
 			ctx.fillText("HP", 75, 445);
 			
-			ctx.fillStyle = "#909090";
+			ctx.fillStyle = "#f09010";
 			ctx.fillRect(750,425,175,50);
+			ctx.strokeRect(750,425,175,50);
 			ctx.fillStyle="#101010";
 			ctx.fillText("(1) "+format(player.pokemon[currentPokemon].json.moves[0].move.name),755,450);
-			ctx.fillStyle = "#909090";
+			ctx.fillStyle = "#f09010";
 			ctx.fillRect(975,425,175,50);
+			ctx.strokeRect(975,425,175,50);
 			ctx.fillStyle="#101010";
 			ctx.fillText("(2) "+format(player.pokemon[currentPokemon].json.moves[1].move.name),980,450);
-			ctx.fillStyle = "#909090";
+			ctx.fillStyle = "#f09010";
 			ctx.fillRect(750,500,175,50);
+			ctx.strokeRect(750,500,175,50);
 			ctx.fillStyle="#101010";
 			ctx.fillText("(3) "+format(player.pokemon[currentPokemon].json.moves[2].move.name),755,525);
-			ctx.fillStyle = "#909090";
+			ctx.fillStyle = "#f09010";
 			ctx.fillRect(975,500,175,50);
+			ctx.strokeRect(975,500,175,50);
 			ctx.fillStyle="#101010";
 			ctx.fillText("(4) "+format(player.pokemon[currentPokemon].json.moves[3].move.name),980,525);
 		}
@@ -248,31 +303,62 @@ function render(){
 		ctx.drawImage(bg2,0,0);
 		ctx.fillStyle = "#000000";
 		ctx.fillRect(5,565,1190,80);
-		ctx.drawImage(foundPokemon.spriteFront,850+animX*4,400+animY*4,92,92);
+		ctx.drawImage(foundPokemon.spriteFront,pokemonLoc+animX*4-46,500-46+animY*4,92,92);
 		
 		ctx.font = "30px Pixelify Sans";
 		ctx.fillStyle = "#e0e0e0";
 		ctx.fillText(userDisplayText.substr(0,displayStep),100,595);
 		ctx.fillText(oppDisplayText.substr(0,displayStep-userDisplayText.length),100,625);
-		
-		if(mouseClicked){
-			ctx.strokeStyle="#f0a010"
-			let effectiveLoc=[];
-			let effectiveDist=Math.sqrt((mouseLoc[0]-105)*(mouseLoc[0]-105)+(mouseLoc[1]-400)*(mouseLoc[1]-400));
-			let angle=Math.atan2((mouseLoc[1]-400),(mouseLoc[0]-105));
-			if(effectiveDist>100){
-				effectiveLoc=[105+100*Math.cos(angle),400+100*Math.sin(angle)];
-				effectiveDist=100;
-			}else{
-				effectiveLoc=mouseLoc;
-			}
-			drawThrough(ctx,5,85,400,effectiveLoc[0],effectiveLoc[1],125,400);
-			ctx.drawImage(pokeball,effectiveLoc[0]-8,effectiveLoc[1]-8);
-
-			ctx.strokeStyle="#a0a0a0";
-			//drawTo(ctx,5,105,400,105+3*(105-effectiveLoc[0]),400+3*(400-effectiveLoc[1]),105+2*(3*(105-effectiveLoc[0])),400)
-			drawBaguette(ctx,5,effectiveLoc[0],500-effectiveLoc[1],effectiveDist,Math.PI-angle,g);
+		if(launchLocPrev){
+			ctx.strokeStyle="#707070";
+			drawBaguette(ctx,5,launchLocPrev[0],500-launchLocPrev[1],velPrev,Math.PI-anglePrev,g);
 		}
+		if(foundPokemon.name){
+			userDisplayText="You Have "+ballCount+" Pokeballs left";
+			if(mouseClicked && ballCount){
+				let launchDist=Math.sqrt((mouseLoc[0]-105)*(mouseLoc[0]-105)+(mouseLoc[1]-400)*(mouseLoc[1]-400));
+				angle=Math.atan2((mouseLoc[1]-400),(mouseLoc[0]-105));
+				if(launchDist>75){
+					launchLoc=[105+75*Math.cos(angle),400+75*Math.sin(angle)];
+					launchDist=75;
+				}else{
+					launchLoc=mouseLoc;
+				}
+				vel=launchDist*1.4;
+				ballLoc=launchLoc;
+
+				ctx.strokeStyle="#f0a010";
+				drawThrough(ctx,5,85,400,launchLoc[0],launchLoc[1],125,400);
+				ballTime=0;
+			}else{
+				if(ballTime==0){
+					ballCount--;
+					displayStep=0;
+				}
+				ballTime+=0.075;
+				ballLoc=[vel*Math.cos(Math.PI+angle)*ballTime+launchLoc[0],vel*Math.sin(Math.PI+angle)*ballTime+g*ballTime*ballTime/2+launchLoc[1]]
+				if((ballLoc[0]-pokemonLoc)*(ballLoc[0]-pokemonLoc)+(ballLoc[1]-500+46)*(ballLoc[1]-500+46)<=(46*46*2)){
+					userDisplayText="You Caught "+format(foundPokemon.name);
+					displayStep=0;
+					ballLoc=[];
+					launchLocPrev=launchLoc;
+					velPrev=vel;
+					anglePrev=angle;
+					player.pokemon.push(foundPokemon);
+					foundPokemon={"name":"","json":"","hp":0,"lvl":0,"type":"","scream":"","spriteFront":new Image(),"spriteBack":new Image()};
+				}
+				if(ballLoc && ballLoc[1]>=500){
+					ballLoc=[];
+					launchLocPrev=launchLoc;
+					velPrev=vel;
+					anglePrev=angle;
+				}
+			}
+			if(ballLoc&&launchLoc){
+				ctx.drawImage(pokeball,ballLoc[0]-8,ballLoc[1]-8);
+			}
+		}
+		
 	}
 }
 loadData();
@@ -334,6 +420,11 @@ window.addEventListener('keydown', function(event) {
 			if(foundPokemon.hp>0&&currentPokemon<player.pokemon.length){
 				if(foundPokemon.hp/foundPokemon.json.stats[0].base_stat<1/3){
 					page="minigame"
+					pokemonLoc=650+Math.random()*400;
+					ballCount=5;
+					userDisplayText="";
+					oppDisplayText="";
+					displayStep=0;
 				}else{
 					userDisplayText="Couldn't Catch "+format(foundPokemon.name)+" Because its HP is too high";
 					oppDisplayText="";
@@ -348,41 +439,12 @@ window.addEventListener('keydown', function(event) {
 			}
 		}else if("1"<=event.key<="4"){
 			if(foundPokemon.hp>0&&currentPokemon<player.pokemon.length&&event.key-1<player.pokemon[currentPokemon].json.moves.length){
-				foundPokemon.scream.play();
-				foundPokemon.hp-=Math.ceil((Math.max(0,player.pokemon[currentPokemon].json.stats[1].base_stat-(foundPokemon.json.stats[2].base_stat/2))/10)*matchups[player.pokemon[currentPokemon].type][foundPokemon.type]);
-				player.pokemon[currentPokemon].hp-=Math.ceil((Math.max(0,foundPokemon.json.stats[1].base_stat-(player.pokemon[currentPokemon].json.stats[2].base_stat/2))/10)*matchups[foundPokemon.type][player.pokemon[currentPokemon].type]);
-				userDisplayText="You Used "+format(player.pokemon[currentPokemon].json.moves[event.key-1].move.name);
-				oppDisplayText=format(foundPokemon.name)+" Used "+format(foundPokemon.json.moves[Math.floor(foundPokemon.json.moves.length*Math.random())].move.name);
-				displayStep=0;
-				oppRenderStep=0;
-				if(matchups[foundPokemon.type][player.pokemon[currentPokemon].type]==2){
-					oppDisplayText+=", It was Super Effective";
-					oppRenderStep=0;
-				}
-				if(matchups[player.pokemon[currentPokemon].type][foundPokemon.type]==2){
-					userDisplayText+=", It was Super Effective";
-					displayStep=0;
-				}
-				if(matchups[foundPokemon.type][player.pokemon[currentPokemon].type]==0.5){
-					oppDisplayText+=", It was not Very Effective";
-					oppRenderStep=0;
-				}
-				if(matchups[player.pokemon[currentPokemon].type][foundPokemon.type]==0.5){
-					userDisplayText+=", It was not Very Effective";
-					displayStep=0;
-				}
-				if(foundPokemon.hp<=0){
-					oppDisplayText+=" but it Fainted";
-					oppRenderStep=0;
-					foundPokemon.hp=0;
-				}
-				if(player.pokemon[currentPokemon].hp<=0){
-					userDisplayText+=" but it Fainted";
-					displayStep=0;
-					player.pokemon[currentPokemon].hp=0;
-					currentPokemon++;
-				}
+				doAttack(event.key);
 			}
+		}
+	}else if(page=="minigame"){
+		if(foundPokemon.name==""&&event.key==" "){
+			page="map";
 		}
 	}
 });
@@ -392,6 +454,21 @@ window.addEventListener(('mousemove'), function(event){
 window.addEventListener(('mousedown'), function(event){
 	mouseLoc = [event.clientX-canvasPos.left,event.clientY-canvasPos.top];
 	mouseClicked=true;
+	if(page=="battle"){
+		
+		if(750<=mouseLoc[0] && mouseLoc[0]<=750+175 && 425<=mouseLoc[1] && mouseLoc[1]<=425+50){
+			doAttack(1);
+		}
+		if(975<=mouseLoc[0] && mouseLoc[0]<=975+175 && 425<=mouseLoc[1] && mouseLoc[1]<=425+50){
+			doAttack(2);
+		}
+		if(750<=mouseLoc[0] && mouseLoc[0]<=750+175 && 500<=mouseLoc[1] && mouseLoc[1]<=500+50){
+			doAttack(3);
+		}
+		if(975<=mouseLoc[0] && mouseLoc[0]<=975+175 && 500<=mouseLoc[1] && mouseLoc[1]<=500+50){
+			doAttack(4);
+		}
+}
 });
 window.addEventListener(('mouseup'), function(event){
 	mouseClicked=false;	

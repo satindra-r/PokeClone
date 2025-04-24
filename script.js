@@ -8,9 +8,16 @@ let foundPokemon={"name":"","json":"","hp":0,"lvl":0,"type":"","scream":"","spri
 let currentPokemon=0;
 let map=new Image();
 let bg=new Image();
+let bg2=new Image();
+let pokeball=new Image();
 let userDisplayText="Try Again";
 let oppDisplayText="";
 let animStep=0;
+let displayStep=0;
+let mouseClicked=false;
+let mouseLoc=[0,0];
+let canvasPos = canvas.getBoundingClientRect();
+let g=0.5;
 let matchups=
 			{"fire":{"fire":0.5,"water":0.5,"grass":2,"ice":2,"ground":1,"rock":0.5}
 			,"water":{"fire":2,"water":0.5,"grass":0.5,"ice":1,"ground":2,"rock":2}
@@ -30,6 +37,38 @@ let mapTiles=
 function clamp(min,x,max){
 	return Math.min(Math.max(min,x),max);
 }
+function format(str){
+	str2="";
+	for(let i=0;i<str.length;i++){
+		if(i==0||str.charAt(i-1)=="-"){
+			str2+=str.charAt(i).toUpperCase()
+		}else if(str.charAt(i)=="-"){
+			str2+=" ";
+		}else{
+			str2+=str.charAt(i);
+		}
+	}
+	return str2;
+}
+function drawTo(ctx,thickness,x1,y1,x2,y2,x3,y3){
+	ctx.lineWidth = thickness;
+	ctx.beginPath();
+	ctx.moveTo(x1,y1);
+	ctx.quadraticCurveTo(x2,y2,x3,y3);
+	ctx.stroke();
+	ctx.lineWidth = 1;
+}
+function drawThrough(ctx,thickness,x1,y1,x2,y2,x3,y3){
+	drawTo(ctx,thickness,x1,y1,2*x2-0.5*x1-0.5*x3,2*y2-0.5*y1-0.5*y3,x3,y3);
+}
+function drawBaguette(ctx,thickness,x1,y1,vel,angle,g){
+	ctx.fillRect(x1,500-y1,100*Math.cos(angle),100*Math.sin(angle));
+	let range=vel*Math.cos(angle)*(vel*Math.sin(angle)+(Math.sqrt(vel*vel*Math.sin(angle)*Math.sin(angle)+2*y1*g)))/g
+	ctx.fillRect(x1,y1,range,10);
+	let y2=(1-(vel*vel*Math.sin(angle)*Math.cos(angle)/(range*g)))*(y1+Math.tan(angle)*range);
+	let x2=(y2-y1)/Math.tan(angle)+x1;
+	drawTo(ctx,thickness,x1,500-y1,x2,500-y2,range+x1,500);
+}
 async function loadData(){	
 	const typesarr = await Promise.all(
 		Object.keys(types).map(async type => {
@@ -43,10 +82,14 @@ async function loadData(){
 async function searchPokemon(loc){ 
 	if(Math.random()>-0.8){
 		let type=mapTiles[player.loc.y][player.loc.x];
-		return getRandomPokemon(type).then((randPokemon)=>{return randPokemon});
+		let randPokemon=await getRandomPokemon(type).then((randPokemon)=>{return randPokemon});
+		userDisplayText=format(randPokemon.name);
+		displayStep=0;
+		return randPokemon;
 	}else{
 		userDisplayText="Try Again";
-		return {"name":"","json":"","sprite":new Image()};
+		displayStep=0;
+		return {"name":"","json":"","hp":0,"lvl":0,"type":"","scream":"","spriteFront":new Image(),"spriteBack":new Image()};
 	}
 }
 async function getRandomPokemon(type){
@@ -56,7 +99,9 @@ async function getRandomPokemon(type){
 	randPokemon.json=await response.json();
 	randPokemon.lvl=Math.floor(Math.random()*100);
 	randPokemon.type=type;
-	randPokemon.hp=randPokemon.json.stats[0].base_stat;
+	//TODO testing
+	//randPokemon.hp=randPokemon.json.stats[0].base_stat;
+	randPokemon.hp=1;
 	await Promise.all([new Promise((resolve) => {
 		randPokemon.spriteFront.src = randPokemon.json.sprites.front_default;
 		randPokemon.spriteFront.onload = resolve;
@@ -95,7 +140,15 @@ async function loadImages(){
 	new Promise((resolve)=>{
 		bg.src="bg.png";
 		bg.onload=resolve;
-	})])
+	}),
+	new Promise((resolve)=>{
+		bg2.src="bg2.png";
+		bg2.onload=resolve;
+	}),
+	new Promise((resolve)=>{
+		pokeball.src="pokeball.png";
+		pokeball.onload=resolve;
+	})]);
 	player.sprites["right"].src="player_right.png";
 	player.sprites["down"].src="player_down.png";
 	player.sprites["left"].src="player_left.png";
@@ -104,6 +157,7 @@ async function loadImages(){
 function render(){
 	animStep+=0.1;
 	animStep%=10;
+	displayStep+=Math.random()/3+0.25;
 	let animX=Math.cos(Math.PI*animStep/5);
 	let animY=-(Math.sin(Math.PI*animStep/5)**2);
 	ctx.font = "25px Pixelify Sans";
@@ -127,12 +181,9 @@ function render(){
 		
 		if(foundPokemon.name){
 			ctx.drawImage(foundPokemon.spriteFront,811+animX*4,36+animY*4,288,288);
-			ctx.fillStyle = "#e0e0e0";
-			ctx.fillText(foundPokemon.name, 800, 350);
-		}else{
-			ctx.fillStyle = "#e0e0e0";
-			ctx.fillText(userDisplayText, 800, 375);
 		}
+		ctx.fillStyle = "#e0e0e0";
+		ctx.fillText(userDisplayText, 800, 375);
 	}else if(page=="battle"){
 		ctx.drawImage(bg,0,0);
 		ctx.fillStyle = "#000000";
@@ -143,8 +194,8 @@ function render(){
 		ctx.fillStyle = "#f09010";
 		ctx.fillRect(825,375,300*foundPokemon.hp/foundPokemon.json.stats[0].base_stat,10);
 		ctx.fillStyle = "#101010";
-		ctx.strokeText(foundPokemon.name, 800, 360);
-		ctx.fillText(foundPokemon.name, 800, 360);
+		ctx.strokeText(format(foundPokemon.name), 800, 360);
+		ctx.fillText(format(foundPokemon.name), 800, 360);
 		ctx.strokeText(foundPokemon.hp+"/"+foundPokemon.json.stats[0].base_stat,800,405);
 		ctx.fillText(foundPokemon.hp+"/"+foundPokemon.json.stats[0].base_stat,800,405);
 		ctx.strokeText("lvl "+foundPokemon.lvl,1070,405);
@@ -161,8 +212,8 @@ function render(){
 			ctx.fillStyle = "#f09010";
 			ctx.fillRect(100,435,300*player.pokemon[currentPokemon].hp/player.pokemon[currentPokemon].json.stats[0].base_stat,10);
 			ctx.fillStyle = "#101010";
-			ctx.strokeText(player.pokemon[currentPokemon].name, 75, 425);
-			ctx.fillText(player.pokemon[currentPokemon].name, 75, 425);
+			ctx.strokeText(format(player.pokemon[currentPokemon].name), 75, 425);
+			ctx.fillText(format(player.pokemon[currentPokemon].name), 75, 425);
 			ctx.strokeText(player.pokemon[currentPokemon].hp+"/"+player.pokemon[currentPokemon].json.stats[0].base_stat,75,465);
 			ctx.fillText(player.pokemon[currentPokemon].hp+"/"+player.pokemon[currentPokemon].json.stats[0].base_stat,75,465);
 			ctx.strokeText("lvl "+player.pokemon[currentPokemon].lvl,345,465);
@@ -174,25 +225,54 @@ function render(){
 			ctx.fillStyle = "#909090";
 			ctx.fillRect(750,425,175,50);
 			ctx.fillStyle="#101010";
-			ctx.fillText("(1) "+player.pokemon[currentPokemon].json.moves[0].move.name,755,450);
+			ctx.fillText("(1) "+format(player.pokemon[currentPokemon].json.moves[0].move.name),755,450);
 			ctx.fillStyle = "#909090";
 			ctx.fillRect(975,425,175,50);
 			ctx.fillStyle="#101010";
-			ctx.fillText("(2) "+player.pokemon[currentPokemon].json.moves[1].move.name,980,450);
+			ctx.fillText("(2) "+format(player.pokemon[currentPokemon].json.moves[1].move.name),980,450);
 			ctx.fillStyle = "#909090";
 			ctx.fillRect(750,500,175,50);
 			ctx.fillStyle="#101010";
-			ctx.fillText("(3) "+player.pokemon[currentPokemon].json.moves[2].move.name,755,525);
+			ctx.fillText("(3) "+format(player.pokemon[currentPokemon].json.moves[2].move.name),755,525);
 			ctx.fillStyle = "#909090";
 			ctx.fillRect(975,500,175,50);
 			ctx.fillStyle="#101010";
-			ctx.fillText("(4) "+player.pokemon[currentPokemon].json.moves[3].move.name,980,525);
+			ctx.fillText("(4) "+format(player.pokemon[currentPokemon].json.moves[3].move.name),980,525);
 		}
 		ctx.font = "30px Pixelify Sans";
 		ctx.fillStyle = "#e0e0e0";
-		ctx.fillText(userDisplayText,100,595);
-		ctx.fillText(oppDisplayText,100,625);
+		ctx.fillText(userDisplayText.substr(0,displayStep),100,595);
+		ctx.fillText(oppDisplayText.substr(0,displayStep-userDisplayText.length),100,625);
 		
+	}else if(page=="minigame"){
+		ctx.drawImage(bg2,0,0);
+		ctx.fillStyle = "#000000";
+		ctx.fillRect(5,565,1190,80);
+		ctx.drawImage(foundPokemon.spriteFront,850+animX*4,400+animY*4,92,92);
+		
+		ctx.font = "30px Pixelify Sans";
+		ctx.fillStyle = "#e0e0e0";
+		ctx.fillText(userDisplayText.substr(0,displayStep),100,595);
+		ctx.fillText(oppDisplayText.substr(0,displayStep-userDisplayText.length),100,625);
+		
+		if(mouseClicked){
+			ctx.strokeStyle="#f0a010"
+			let effectiveLoc=[];
+			let effectiveDist=Math.sqrt((mouseLoc[0]-105)*(mouseLoc[0]-105)+(mouseLoc[1]-400)*(mouseLoc[1]-400));
+			let angle=Math.atan2((mouseLoc[1]-400),(mouseLoc[0]-105));
+			if(effectiveDist>100){
+				effectiveLoc=[105+100*Math.cos(angle),400+100*Math.sin(angle)];
+				effectiveDist=100;
+			}else{
+				effectiveLoc=mouseLoc;
+			}
+			drawThrough(ctx,5,85,400,effectiveLoc[0],effectiveLoc[1],125,400);
+			ctx.drawImage(pokeball,effectiveLoc[0]-8,effectiveLoc[1]-8);
+
+			ctx.strokeStyle="#a0a0a0";
+			//drawTo(ctx,5,105,400,105+3*(105-effectiveLoc[0]),400+3*(400-effectiveLoc[1]),105+2*(3*(105-effectiveLoc[0])),400)
+			drawBaguette(ctx,5,effectiveLoc[0],500-effectiveLoc[1],effectiveDist,Math.PI-angle,g);
+		}
 	}
 }
 loadData();
@@ -235,10 +315,13 @@ window.addEventListener('keydown', function(event) {
 						player.pokemon.push(foundPokemon);
 						foundPokemon={"name":"","json":"","hp":0,"lvl":0,"type":"","scream":"","spriteFront":new Image(),"spriteBack":new Image()};
 						userDisplayText="Starter Chosen";
+						displayStep=0;
 					}else{
 						page="battle";
 						userDisplayText="";
 						oppDisplayText="";
+						displayStep=0;
+						oppRenderStep=0;
 						currentPokemon=0;
 						for(let i=0;i<player.pokemon.length;i++){
 							player.pokemon[i].hp=player.pokemon[i].json.stats[0].base_stat;
@@ -249,49 +332,67 @@ window.addEventListener('keydown', function(event) {
 	}else if(page=="battle"){
 		if(event.key==" "){
 			if(foundPokemon.hp>0&&currentPokemon<player.pokemon.length){
-				if(Math.random()>foundPokemon.hp/foundPokemon.json.stats[0].base_stat){
-					userDisplayText="You Caught "+foundPokemon.name;
-					player.pokemon.push(foundPokemon);
-					foundPokemon={"name":"","json":"","hp":0,"lvl":0,"type":"","scream":"","spriteFront":new Image(),"spriteBack":new Image()};
-					page="map"
+				if(foundPokemon.hp/foundPokemon.json.stats[0].base_stat<1/3){
+					page="minigame"
 				}else{
-					userDisplayText="Couldn't Catch "+foundPokemon.name;
+					userDisplayText="Couldn't Catch "+format(foundPokemon.name)+" Because its HP is too high";
 					oppDisplayText="";
+					displayStep=0;
+					oppRenderStep=0;
 				}
 			}else{
 				page="map";
 				foundPokemon={"name":"","json":"","hp":0,"lvl":0,"type":"","scream":"","spriteFront":new Image(),"spriteBack":new Image()};
 				userDisplayText="Try Again";
+				displayStep=0;
 			}
 		}else if("1"<=event.key<="4"){
 			if(foundPokemon.hp>0&&currentPokemon<player.pokemon.length&&event.key-1<player.pokemon[currentPokemon].json.moves.length){
 				foundPokemon.scream.play();
 				foundPokemon.hp-=Math.ceil((Math.max(0,player.pokemon[currentPokemon].json.stats[1].base_stat-(foundPokemon.json.stats[2].base_stat/2))/10)*matchups[player.pokemon[currentPokemon].type][foundPokemon.type]);
 				player.pokemon[currentPokemon].hp-=Math.ceil((Math.max(0,foundPokemon.json.stats[1].base_stat-(player.pokemon[currentPokemon].json.stats[2].base_stat/2))/10)*matchups[foundPokemon.type][player.pokemon[currentPokemon].type]);
-				userDisplayText="You Used "+player.pokemon[currentPokemon].json.moves[event.key-1].move.name;
-				oppDisplayText=foundPokemon.name+" Used "+foundPokemon.json.moves[Math.floor(foundPokemon.json.moves.length*Math.random())].move.name;
+				userDisplayText="You Used "+format(player.pokemon[currentPokemon].json.moves[event.key-1].move.name);
+				oppDisplayText=format(foundPokemon.name)+" Used "+format(foundPokemon.json.moves[Math.floor(foundPokemon.json.moves.length*Math.random())].move.name);
+				displayStep=0;
+				oppRenderStep=0;
 				if(matchups[foundPokemon.type][player.pokemon[currentPokemon].type]==2){
-					oppDisplayText+=", It was super effective";
+					oppDisplayText+=", It was Super Effective";
+					oppRenderStep=0;
 				}
 				if(matchups[player.pokemon[currentPokemon].type][foundPokemon.type]==2){
-					userDisplayText+=", It was super effective";
+					userDisplayText+=", It was Super Effective";
+					displayStep=0;
 				}
 				if(matchups[foundPokemon.type][player.pokemon[currentPokemon].type]==0.5){
-					oppDisplayText+=", It was not very effective";
+					oppDisplayText+=", It was not Very Effective";
+					oppRenderStep=0;
 				}
 				if(matchups[player.pokemon[currentPokemon].type][foundPokemon.type]==0.5){
-					userDisplayText+=", It was not very effective";
+					userDisplayText+=", It was not Very Effective";
+					displayStep=0;
 				}
 				if(foundPokemon.hp<=0){
-					oppDisplayText+=" but it fainted";
+					oppDisplayText+=" but it Fainted";
+					oppRenderStep=0;
 					foundPokemon.hp=0;
 				}
 				if(player.pokemon[currentPokemon].hp<=0){
-					userDisplayText+=" but it fainted";
+					userDisplayText+=" but it Fainted";
+					displayStep=0;
 					player.pokemon[currentPokemon].hp=0;
 					currentPokemon++;
 				}
 			}
 		}
 	}
+});
+window.addEventListener(('mousemove'), function(event){
+	mouseLoc = [event.clientX-canvasPos.left,event.clientY-canvasPos.top];
+});
+window.addEventListener(('mousedown'), function(event){
+	mouseLoc = [event.clientX-canvasPos.left,event.clientY-canvasPos.top];
+	mouseClicked=true;
+});
+window.addEventListener(('mouseup'), function(event){
+	mouseClicked=false;	
 });

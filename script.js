@@ -89,9 +89,8 @@ async function loadData(){
 	);
 	types=Object.fromEntries(typesarr);
 }
-async function searchPokemon(loc){
-	//TODO testing 
-	if(Math.random()>-0.8){
+async function searchPokemon(loc){ 
+	if(Math.random()>0.8){
 		let type=mapTiles[player.loc.y][player.loc.x];
 		let randPokemon=await getRandomPokemon(type).then((randPokemon)=>{return randPokemon});
 		userDisplayText=format(randPokemon.name);
@@ -370,11 +369,12 @@ function render(){
 				ctx.drawImage(pokeball,ballLoc[0]-8,ballLoc[1]-8);
 			}else if(ballCount>0){
 				ctx.drawImage(pokeball,105-8,400-8);
-				console.log("hi2");
 			}
-			console.log("hi");
 		}
-		
+	}else if(page=="gameover"){
+		ctx.fillStyle="#f0f0f0";
+		ctx.font = "50px Pixelify Sans";
+		ctx.fillText("Game Over",475,325);
 	}
 }
 
@@ -384,7 +384,6 @@ function loadOST() {
 	  .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
 	  .then(decodedBuffer => {
 		buffer = decodedBuffer;
-		console.log('OST loaded!');
 	  });
 	 }
   
@@ -400,7 +399,7 @@ function playOST() {
 	loadOST();
   });
   
-document.addEventListener('click', playOST);
+document.addEventListener('keydown', playOST);
 
 loadData();
 loadImages();
@@ -477,10 +476,7 @@ window.addEventListener('keydown', function(event) {
 					oppRenderStep=0;
 				}
 			}else{
-				page="map";
-				foundPokemon={"name":"","json":"","hp":0,"lvl":0,"type":"","scream":"","spriteFront":new Image(),"spriteBack":new Image()};
-				userDisplayText="Try Again";
-				displayStep=0;
+				page="gameover";
 			}
 		}else if("1"<=event.key<="4"){
 			if(foundPokemon.hp>0&&currentPokemon<player.pokemon.length&&event.key-1<player.pokemon[currentPokemon].json.moves.length){

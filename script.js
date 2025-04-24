@@ -30,6 +30,7 @@ let g=10;
 let ballTime=Infinity;
 let audioContext = new (window.AudioContext || window.webkitAudioContext)();
 let buffer = null;
+let playing=false;
 let matchups=
 			{"fire":{"fire":0.5,"water":0.5,"grass":2,"ice":2,"ground":1,"rock":0.5}
 			,"water":{"fire":2,"water":0.5,"grass":0.5,"ice":1,"ground":2,"rock":2}
@@ -388,12 +389,13 @@ function loadOST() {
 	 }
   
 function playOST() {
-	if (buffer) {
+	if (buffer&&!playing) {
 		const source = audioContext.createBufferSource();
 		source.buffer = buffer;
 		source.connect(audioContext.destination);
 		source.start(0);	
 	}
+	playing=true;
 }
   window.addEventListener('load', () => {
 	loadOST();
@@ -445,6 +447,7 @@ window.addEventListener('keydown', function(event) {
 						displayStep=0;
 					}else{
 						page="battle";
+						foundPokemon.scream.play();
 						userDisplayText="";
 						oppDisplayText="";
 						displayStep=0;

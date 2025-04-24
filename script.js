@@ -3,12 +3,12 @@ const ctx = canvas.getContext("2d");
 ctx.imageSmoothingEnabled = false;
 let types={"ice":"","rock":"","water":"","grass":"","ground":"","fire":""};
 let page="instructions";
-let player={"dir":"down","loc":{"x":0,"y":0},"sprites":{"up":new Image(),"right":new Image(),"down":new Image(),"left":new Image()},"pokemon":[]};
+let player={"dir":"down","loc":{"x":0,"y":0},"sprites":{"up":new Image(),"right":new Image(),"down":new Image(),"left":new Image(),"boat":new Image(),"pot":new Image()},"pokemon":[]};
 let foundPokemon={"name":"","json":"","hp":0,"lvl":0,"type":"","scream":"","spriteFront":new Image(),"spriteBack":new Image()};
 let currentPokemon=0;
 let map=new Image();
-let bg=new Image();
-let bg2=new Image();
+let bgBattle=new Image();
+let bgMinigame=new Image();
 let pokeball=new Image();
 let userDisplayText="Try Again";
 let oppDisplayText="";
@@ -28,6 +28,8 @@ let angle=0;
 let anglePrev=0;
 let g=10;
 let ballTime=Infinity;
+let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+let buffer = null;
 let matchups=
 			{"fire":{"fire":0.5,"water":0.5,"grass":2,"ice":2,"ground":1,"rock":0.5}
 			,"water":{"fire":2,"water":0.5,"grass":0.5,"ice":1,"ground":2,"rock":2}
@@ -125,41 +127,45 @@ async function getRandomPokemon(type){
 }
 async function loadImages(){
 	await Promise.all([new Promise((resolve)=>{
-		player.sprites["up"].src="player_up.png";
+		player.sprites["up"].src="/assets/player_up.png";
 		player.sprites["up"].onload=resolve;
 	}),
 	new Promise((resolve)=>{
-		player.sprites["right"].src="player_right.png";
+		player.sprites["right"].src="/assets/player_right.png";
 		player.sprites["right"].onload=resolve;
 	}),
 	new Promise((resolve)=>{
-		player.sprites["down"].src="player_down.png";
+		player.sprites["down"].src="/assets/player_down.png";
 		player.sprites["down"].onload=resolve;
 	}),
 	new Promise((resolve)=>{
-		player.sprites["left"].src="player_left.png";
+		player.sprites["left"].src="/assets/player_left.png";
 		player.sprites["left"].onload=resolve;
 	}),
 	new Promise((resolve)=>{
-		map.src="map.png";
+		player.sprites["boat"].src="/assets/player_boat.png";
+		player.sprites["boat"].onload=resolve;
+	}),
+	new Promise((resolve)=>{
+		player.sprites["pot"].src="/assets/player_pot.png";
+		player.sprites["pot"].onload=resolve;
+	}),
+	new Promise((resolve)=>{
+		map.src="/assets/map.png";
 		map.onload=resolve;
 	}),
 	new Promise((resolve)=>{
-		bg.src="bg.png";
-		bg.onload=resolve;
+		bgBattle.src="/assets/bgBattle.png";
+		bgBattle.onload=resolve;
 	}),
 	new Promise((resolve)=>{
-		bg2.src="bg2.png";
-		bg2.onload=resolve;
+		bgMinigame.src="/assets/bgMinigame.png";
+		bgMinigame.onload=resolve;
 	}),
 	new Promise((resolve)=>{
-		pokeball.src="pokeball.png";
+		pokeball.src="/assets/pokeball.png";
 		pokeball.onload=resolve;
 	})]);
-	player.sprites["right"].src="player_right.png";
-	player.sprites["down"].src="player_down.png";
-	player.sprites["left"].src="player_left.png";
-	map.src="map.png";
 }
 function doAttack(num){
 	foundPokemon.scream.play();
@@ -216,19 +222,25 @@ function render(){
 		ctx.fillText("Press Space to continue",100,425);
 	}else if(page=="map"){
 		ctx.drawImage(map,25,25,512,512);
-		if(player.dir=="up"||player.dir=="down"){
-			ctx.drawImage(player.sprites[player.dir],25+10+player.loc.x*64+animX*2,25+10+player.loc.y*64+animY*2,40,40);
+		let type=mapTiles[player.loc.y][player.loc.x];
+		if(type=="water"){
+			ctx.drawImage(player.sprites["boat"],25+10+player.loc.x*64,25+10+player.loc.y*64+animY*2,40,40);
+		}else if(type=="rock"){
+			ctx.drawImage(player.sprites["pot"],25+10+player.loc.x*64,25+10+player.loc.y*64,40,40);
 		}else{
-			ctx.drawImage(player.sprites[player.dir],25+10+player.loc.x*64,25+10+player.loc.y*64+animY*2,40,40);
+			if(player.dir=="up"||player.dir=="down"){
+				ctx.drawImage(player.sprites[player.dir],25+10+player.loc.x*64+animX*2,25+10+player.loc.y*64+animY*2,40,40);
+			}else{
+				ctx.drawImage(player.sprites[player.dir],25+10+player.loc.x*64,25+10+player.loc.y*64+animY*2,40,40);
+			}
 		}
-		
 		if(foundPokemon.name){
 			ctx.drawImage(foundPokemon.spriteFront,811+animX*4,36+animY*4,288,288);
 		}
 		ctx.fillStyle = "#e0e0e0";
 		ctx.fillText(userDisplayText, 800, 375);
 	}else if(page=="battle"){
-		ctx.drawImage(bg,0,0);
+		ctx.drawImage(bgBattle,0,0);
 		ctx.fillStyle = "#000000";
 		ctx.fillRect(5,565,1190,80);
 		ctx.drawImage(foundPokemon.spriteFront,811+animX*4,36+animY*4,288,288);
@@ -300,7 +312,7 @@ function render(){
 		ctx.fillText(oppDisplayText.substr(0,displayStep-userDisplayText.length),100,625);
 		
 	}else if(page=="minigame"){
-		ctx.drawImage(bg2,0,0);
+		ctx.drawImage(bgMinigame,0,0);
 		ctx.fillStyle = "#000000";
 		ctx.fillRect(5,565,1190,80);
 		ctx.drawImage(foundPokemon.spriteFront,pokemonLoc+animX*4-46,500-46+animY*4,92,92);
@@ -327,7 +339,7 @@ function render(){
 				vel=launchDist*1.4;
 				ballLoc=launchLoc;
 
-				ctx.strokeStyle="#f0a010";
+				ctx.strokeStyle="#502010";
 				drawThrough(ctx,5,85,400,launchLoc[0],launchLoc[1],125,400);
 				ballTime=0;
 			}else{
@@ -347,23 +359,53 @@ function render(){
 					player.pokemon.push(foundPokemon);
 					foundPokemon={"name":"","json":"","hp":0,"lvl":0,"type":"","scream":"","spriteFront":new Image(),"spriteBack":new Image()};
 				}
-				if(ballLoc && ballLoc[1]>=500){
+				if(ballLoc.length && ballLoc[1]>=500){
 					ballLoc=[];
 					launchLocPrev=launchLoc;
 					velPrev=vel;
 					anglePrev=angle;
 				}
 			}
-			if(ballLoc&&launchLoc){
+			if(ballLoc.length&&launchLoc.length){
 				ctx.drawImage(pokeball,ballLoc[0]-8,ballLoc[1]-8);
+			}else if(ballCount>0){
+				ctx.drawImage(pokeball,105-8,400-8);
+				console.log("hi2");
 			}
+			console.log("hi");
 		}
 		
 	}
 }
+
+function loadOST() {
+	return fetch('/assets/OST.mp3')
+	  .then(response => response.arrayBuffer())
+	  .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
+	  .then(decodedBuffer => {
+		buffer = decodedBuffer;
+		console.log('OST loaded!');
+	  });
+	 }
+  
+function playOST() {
+	if (buffer) {
+		const source = audioContext.createBufferSource();
+		source.buffer = buffer;
+		source.connect(audioContext.destination);
+		source.start(0);	
+	}
+}
+  window.addEventListener('load', () => {
+	loadOST();
+  });
+  
+document.addEventListener('click', playOST);
+
 loadData();
 loadImages();
 setInterval(render, 10);
+window.addEventListener('load', loadOST);
 window.addEventListener('keydown', function(event) {
 	if(page=="instructions"){
 		if(event.key==" "){
@@ -425,6 +467,9 @@ window.addEventListener('keydown', function(event) {
 					userDisplayText="";
 					oppDisplayText="";
 					displayStep=0;
+					ballLoc=[];
+					ballTime=Infinity;
+					launchLocPrev=[];
 				}else{
 					userDisplayText="Couldn't Catch "+format(foundPokemon.name)+" Because its HP is too high";
 					oppDisplayText="";
@@ -445,6 +490,10 @@ window.addEventListener('keydown', function(event) {
 	}else if(page=="minigame"){
 		if(foundPokemon.name==""&&event.key==" "){
 			page="map";
+		}else if(ballCount==0&&event.key==" "){
+			page="map";
+			userDisplayText="Couldn't Catch "+format(foundPokemon.name)+" Because You Ran Out of Pokeballs"
+			displayStep=0;
 		}
 	}
 });
@@ -455,20 +504,21 @@ window.addEventListener(('mousedown'), function(event){
 	mouseLoc = [event.clientX-canvasPos.left,event.clientY-canvasPos.top];
 	mouseClicked=true;
 	if(page=="battle"){
-		
-		if(750<=mouseLoc[0] && mouseLoc[0]<=750+175 && 425<=mouseLoc[1] && mouseLoc[1]<=425+50){
-			doAttack(1);
+		if(foundPokemon.hp>0&&currentPokemon<player.pokemon.length){
+			if(750<=mouseLoc[0] && mouseLoc[0]<=750+175 && 425<=mouseLoc[1] && mouseLoc[1]<=425+50){
+				doAttack(1);
+			}
+			if(975<=mouseLoc[0] && mouseLoc[0]<=975+175 && 425<=mouseLoc[1] && mouseLoc[1]<=425+50){
+				doAttack(2);
+			}
+			if(750<=mouseLoc[0] && mouseLoc[0]<=750+175 && 500<=mouseLoc[1] && mouseLoc[1]<=500+50){
+				doAttack(3);
+			}
+			if(975<=mouseLoc[0] && mouseLoc[0]<=975+175 && 500<=mouseLoc[1] && mouseLoc[1]<=500+50){
+				doAttack(4);
+			}
 		}
-		if(975<=mouseLoc[0] && mouseLoc[0]<=975+175 && 425<=mouseLoc[1] && mouseLoc[1]<=425+50){
-			doAttack(2);
-		}
-		if(750<=mouseLoc[0] && mouseLoc[0]<=750+175 && 500<=mouseLoc[1] && mouseLoc[1]<=500+50){
-			doAttack(3);
-		}
-		if(975<=mouseLoc[0] && mouseLoc[0]<=975+175 && 500<=mouseLoc[1] && mouseLoc[1]<=500+50){
-			doAttack(4);
-		}
-}
+	}
 });
 window.addEventListener(('mouseup'), function(event){
 	mouseClicked=false;	

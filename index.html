@@ -8,9 +8,24 @@ PokeClone
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet">
+<style>
+    @media (orientation: landscape) {
+        #hidden{
+            display: none;
+        }
+    }
+    @media (orientation: portrait) {
+        canvas{
+            display: none;
+        }
+    }
+</style>
 </head>
 <body style="background-color: #101020;">
-<div style="display:flex; justify-content: center;">
+    <div style="display:flex; justify-content: center;vertical-align:middle;">
+    <h1 id="hidden" style="color: #f0f0f0;font:5vmin 'Pixelify Sans'; text-align: center; line-height: 100vh;">
+        Please Switch to Landscape Mode
+    </h1>
 <canvas id="canvas" width="1200" height="650" style="image-rendering: pixelated;"></canvas>
 </div>
 </body>
